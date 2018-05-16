@@ -1,0 +1,12 @@
+[package]
+name = "xbackground"
+version = "0.1.0"
+authors = ["Spencer Powell <krornus@gmail.com>"]
+
+[dependencies]
+libc = "0.2"
+imlib2 = { path = "../imlib2-rs" }
+
+[dependencies.x11]
+version = "2.17.3"
+features = ["xlib","xinerama"]
