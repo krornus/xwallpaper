@@ -25,9 +25,6 @@ fn set_background() {
         "/home/spowell/pictures/backgrounds/darkstar_poster.jpg", drawable
     ).unwrap();
 
-    wallpaper.render(scr, render::Mode::Center);
-
-    wrapper::imlib2::imlib_image_set_changes_on_disk();
 
     xsess.sync(false);
 
@@ -44,13 +41,16 @@ fn set_background() {
     );
 
     xsess2.fill_rectangle(
-        drawable2, gc, 0, 0,
+        drawable, gc, 0, 0,
         scr.width as u32, scr.height as u32
     );
 
     //xsess2.free_gc(gc);
     xsess.sync(false);
     xsess2.sync(false);
+
+    wallpaper.render(scr, render::Mode::Center);
+    wrapper::imlib2::imlib_image_set_changes_on_disk();
 
     //xsess.free_pixmap(drawable);
 
