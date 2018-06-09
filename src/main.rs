@@ -19,12 +19,7 @@ fn set_background() {
     wrapper::imlib2::init_imlib2(&xsess, 4);
 
     let color = xsess.named_color("black");
-    let drawable = xsess.root.pixmap(1920,1080,xsess.depth);
-
-    let wallpaper = render::Wallpaper::load(
-        "/home/spowell/pictures/backgrounds/darkstar_poster.jpg", drawable
-    ).unwrap();
-
+    let drawable = xsess.root.pixmap(scr.width as u32, scr.height as u32, xsess.depth);
 
     xsess.sync(false);
 
@@ -35,15 +30,19 @@ fn set_background() {
     gcvalues.tile = drawable;
     gcvalues.foreground = color.pixel;
 
-    let gc = xsess2.gc(drawable2,
-        (xlib::GCFillStyle | xlib::GCTile) as u64,
+    let gc = xsess.gc(drawable2,
+        (xlib::GCForeground) as u64,
         &mut gcvalues
     );
 
-    xsess2.fill_rectangle(
+    xsess.fill_rectangle(
         drawable, gc, 0, 0,
         scr.width as u32, scr.height as u32
     );
+
+    let wallpaper = render::Wallpaper::load(
+        "/home/spowell/pictures/backgrounds/darkstar_poster.jpg", drawable
+    ).unwrap();
 
     //xsess2.free_gc(gc);
     xsess.sync(false);
