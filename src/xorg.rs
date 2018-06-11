@@ -63,6 +63,7 @@ impl Initialize for xlib::XGCValues {
         }
     }
 }
+
 pub struct XorgSession {
     pub disp: *mut xlib::Display,
     pub visual: *mut xlib::Visual,
@@ -228,7 +229,7 @@ impl XorgSession {
     }
 
 
-    pub fn gc(&self, drawable: xlib::Drawable, valuemask: c_ulong, values: &mut xlib::XGCValues) -> xlib::GC {
+    pub fn gc(&self, drawable: c_ulong, valuemask: c_ulong, values: &mut xlib::XGCValues) -> xlib::GC {
         XCreateGC(
             self.disp, drawable,
             valuemask,

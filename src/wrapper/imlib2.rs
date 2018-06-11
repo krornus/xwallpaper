@@ -26,28 +26,12 @@ pub fn imlib_context_set_colormap(colormap: xlib::Colormap) {
     unsafe { imlib2::imlib_context_set_colormap(colormap) }
 }
 
-pub fn _imlib_context_set_color_modifier(color_modifier: imlib2::Imlib_Color_Modifier) {
-    unsafe { imlib2::imlib_context_set_color_modifier(color_modifier) }
-}
-
-pub fn _imlib_context_set_progress_function(progress_function: imlib2::Imlib_Progress_Function) {
-    unsafe { imlib2::imlib_context_set_progress_function(progress_function) }
-}
-
 pub fn imlib_context_set_operation(operation: imlib2::Imlib_Operation) {
     unsafe { imlib2::imlib_context_set_operation(operation) }
 }
 
 pub fn imlib_set_cache_size(bytes: c_int) {
     unsafe { imlib2::imlib_set_cache_size(bytes) }
-}
-
-pub fn _imlib_create_image(width: c_int, height: c_int) -> imlib2::Imlib_Image {
-    unsafe { imlib2::imlib_create_image(width, height) }
-}
-
-pub fn _imlib_context_set_image(image: imlib2::Imlib_Image) {
-    unsafe { imlib2::imlib_context_set_image(image) }
 }
 
 pub fn imlib_image_set_changes_on_disk() {

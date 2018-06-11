@@ -59,8 +59,8 @@ impl Wallpaper {
 
     fn render_center(&self, area: imlib2::Rect) {
 
-        let mut cx: i32 = (area.w - self.image.width as i32) / 2;
-        let mut cy: i32 = (area.h - self.image.height as i32) / 2;
+        let cx: i32 = (area.w - self.image.width as i32) / 2;
+        let cy: i32 = (area.h - self.image.height as i32) / 2;
 
         // true if image wider than screen
         let xltz = cx < 0;
@@ -108,7 +108,7 @@ impl Wallpaper {
             part = imlib2::Rect { x,y,w,h };
         }
 
-        let size = imlib2::Rect {
+        size = imlib2::Rect {
             x: 0,
             y: 0,
             w: area.w,
@@ -141,7 +141,7 @@ impl Wallpaper {
         self.drawable.render_image(&self.image, size);
     }
 
-    fn render_tile(&self, area: imlib2::Rect) {
+    fn render_tile(&self, _: imlib2::Rect) {
     }
 
 }
