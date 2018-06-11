@@ -5,13 +5,10 @@ use std::os::raw::c_void;
 
 use libc::{c_ulong,c_int,c_uint,c_uchar,c_long};
 use x11::{xlib,xinerama};
+use imlib2_wrapper;
 
 pub trait Initialize {
     fn initialize() -> Self;
-}
-
-pub trait IsNull {
-    fn is_null(&self) -> bool;
 }
 
 impl Initialize for xlib::XColor {
@@ -215,6 +212,7 @@ impl XorgSession {
     }
 
     pub fn atom(&self, atom_name: &str, only_if_exists: bool) -> Option<xlib::Atom> {
+
         let atom = XInternAtom(self.disp, atom_name, only_if_exists);
 
         if atom == 0 {
@@ -237,14 +235,26 @@ impl XorgSession {
         )
     }
 
-    pub fn named_color(&self, name: &str) -> xlib::XColor {
+    pub fn named_color<T: AsRef<str>>(&self, name: T) -> xlib::XColor {
 
         let mut color = xlib::XColor::initialize();
 
         XAllocNamedColorSame(
             self.disp,
             self.colormap,
-            name, &mut color
+            name.as_ref(), &mut color
+        );
+
+        color
+    }
+
+    pub fn parse_color<T: AsRef<str>>(&self, val: T) -> xlib::XColor {
+        let mut color = xlib::XColor::initialize();
+
+        XParseColor(
+            self.disp,
+            self.colormap,
+            val.as_ref(), &mut color
         );
 
         color
@@ -254,7 +264,28 @@ impl XorgSession {
 pub struct XineramaScreens<'a> {
     pub screens: Vec<&'a xinerama::XineramaScreenInfo>,
     pub count: i32,
-    pub screen: i32,
+    pub screen: Option<i32>,
+}
+
+impl<'a> XineramaScreens<'a> {
+    pub fn active_screen(&self) -> Option<&'a xinerama::XineramaScreenInfo> {
+        if let Some(screen) = self.screen {
+            Some(self.screens[screen as usize])
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> imlib2_wrapper::AsRect for &'a xinerama::XineramaScreenInfo {
+    fn as_rect(&self) -> imlib2_wrapper::Rect {
+        imlib2_wrapper::Rect {
+            x: self.x_org.into(),
+            y: self.y_org.into(),
+            w: self.width.into(),
+            h: self.height.into(),
+        }
+    }
 }
 
 impl XorgSession {
@@ -264,7 +295,7 @@ impl XorgSession {
 
             let mut _screens_ptr = ptr::null();
             let mut count: i32 = 0;
-            let mut screen: i32 = 0;
+            let mut screen = None;
 
             let pointer = self.root.query_pointer();
             let pos = Point { x: pointer.rx, y: pointer.ry };
@@ -282,7 +313,7 @@ impl XorgSession {
                         info.y_org as i32,
                         info.width as i32,
                         info.height as i32) {
-                    screen = i;
+                    screen = Some(i);
                 }
             }
 
@@ -474,6 +505,12 @@ pub fn XFlush(display: *mut xlib::Display) -> c_int {
 pub fn XCloseDisplay(display: *mut xlib::Display) -> c_int {
     unsafe { xlib::XCloseDisplay(display) }
 }
+
+pub fn XParseColor(display: *mut xlib::Display, cmap: c_ulong, val: &str, color: *mut xlib::XColor) -> c_int {
+    let val_str = CString::new(val).unwrap();
+    unsafe { xlib::XParseColor(display, cmap, val_str.as_ptr(), color) }
+}
+
 pub fn XSetCloseDownMode(display: *mut xlib::Display, close_mode: c_int) -> c_int {
     unsafe { xlib::XSetCloseDownMode(display,close_mode) }
 }
@@ -509,30 +546,6 @@ pub struct Pointer {
     pub wx: c_int,
     pub wy: c_int,
     pub mask: c_uint,
-}
-
-impl Pointer {
-    pub fn query(display: *mut xlib::Display, window: c_ulong) -> Self {
-        let mut root: c_ulong = 0;
-        let mut child: c_ulong = 0;
-        let mut rx: c_int = 0;
-        let mut ry: c_int = 0;
-        let mut wx: c_int = 0;
-        let mut wy: c_int = 0;
-        let mut mask: c_uint = 0;
-
-        unsafe { xlib::XQueryPointer(display, window, &mut root, &mut child, &mut rx, &mut ry, &mut wx, &mut wy, &mut mask) };
-
-        Pointer {
-            root,
-            child,
-            rx,
-            ry,
-            wx,
-            wy,
-            mask,
-        }
-    }
 }
 
 struct Point {

@@ -34,10 +34,6 @@ pub fn imlib_set_cache_size(bytes: c_int) {
     unsafe { imlib2::imlib_set_cache_size(bytes) }
 }
 
-pub fn imlib_image_set_changes_on_disk() {
-    unsafe { imlib2::imlib_image_set_changes_on_disk() }
-}
-
 pub fn init_imlib2(xsess: &XorgSession, cache_size: i32) {
     imlib_context_set_display(xsess.disp);
     imlib_context_set_visual(xsess.visual);
@@ -54,19 +50,6 @@ pub struct Image {
 }
 
 impl Image {
-    pub fn new(im: imlib2::Imlib_Image) -> Self {
-        unsafe { imlib2::imlib_context_set_image(im) };
-
-        let w = unsafe { imlib2::imlib_image_get_width() };
-        let h = unsafe { imlib2::imlib_image_get_height() };
-
-        Image {
-            image: im,
-            width: w as u32,
-            height: h as u32,
-        }
-    }
-
     pub fn load<T: AsRef<str>>(file: T) -> Result<Self, imlib2::Imlib_Load_Error> {
 
         let mut err = 0;
@@ -95,6 +78,10 @@ pub struct Rect {
     pub y: i32,
     pub w: i32,
     pub h: i32,
+}
+
+pub trait AsRect {
+    fn as_rect(&self) -> Rect;
 }
 
 impl fmt::Debug for Rect {
