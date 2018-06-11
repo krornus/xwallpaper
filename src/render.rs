@@ -1,9 +1,9 @@
 use x11::xlib;
 
+use imlib2::Imlib_Load_Error;
 use imlib2_wrapper;
-use imlib2::{Imlib_Load_Error};
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub enum Mode {
     Scale,
     Center,
@@ -20,7 +20,6 @@ pub struct Wallpaper {
 
 impl Wallpaper {
     pub fn load(path: &str, drawable: xlib::Drawable) -> Result<Self, Imlib_Load_Error> {
-
         let im = imlib2_wrapper::Image::load(path)?;
         let ctx = imlib2_wrapper::DrawableContext::new(drawable, 1, 1, 0);
 
@@ -52,7 +51,6 @@ impl Wallpaper {
     }
 
     fn render_center(&self, area: imlib2_wrapper::Rect) {
-
         let cx: i32 = (area.w - self.image.width as i32) / 2;
         let cy: i32 = (area.h - self.image.height as i32) / 2;
 
@@ -68,7 +66,6 @@ impl Wallpaper {
             h: area.h,
         };
 
-
         let size = imlib2_wrapper::Rect {
             x: cx * (!xltz as i32),
             y: cy * (!yltz as i32),
@@ -80,9 +77,8 @@ impl Wallpaper {
     }
 
     fn render_fill(&self, area: imlib2_wrapper::Rect) {
-
-        let (img_w,img_h) = (self.image.width as i32, self.image.height as i32);
-        let (part,size): (imlib2_wrapper::Rect, imlib2_wrapper::Rect);
+        let (img_w, img_h) = (self.image.width as i32, self.image.height as i32);
+        let (part, size): (imlib2_wrapper::Rect, imlib2_wrapper::Rect);
 
         let cut_x = (img_w * area.h) > (img_h * area.w);
 
@@ -92,14 +88,14 @@ impl Wallpaper {
             let x = (img_w - w) / 2;
             let y = 0;
 
-            part = imlib2_wrapper::Rect { x,y,w,h };
+            part = imlib2_wrapper::Rect { x, y, w, h };
         } else {
             let w = img_w;
             let h = (img_w * area.h) / area.w;
             let x = 0;
             let y = (img_h - h) / 2;
 
-            part = imlib2_wrapper::Rect { x,y,w,h };
+            part = imlib2_wrapper::Rect { x, y, w, h };
         }
 
         size = imlib2_wrapper::Rect {
@@ -113,29 +109,27 @@ impl Wallpaper {
     }
 
     fn render_max(&self, area: imlib2_wrapper::Rect) {
+        let (img_w, img_h) = (self.image.width as i32, self.image.height as i32);
 
-        let (img_w,img_h) = (self.image.width as i32, self.image.height as i32);
-
-        let (x,y,w,h): (i32, i32, i32, i32);
+        let (x, y, w, h): (i32, i32, i32, i32);
 
         if (img_w * area.h) > (img_h * area.w) {
             w = area.w;
-            h = (img_h*area.w)/img_w;
+            h = (img_h * area.w) / img_w;
             x = area.x;
             y = area.y + (area.h - h) / 2;
         } else {
-            w = (img_w*area.h)/img_h;
+            w = (img_w * area.h) / img_h;
             h = area.h;
             x = area.x + (area.w - w) / 2;
             y = area.y;
         }
 
-        let size = imlib2_wrapper::Rect { x,y,w,h };
+        let size = imlib2_wrapper::Rect { x, y, w, h };
 
         self.drawable.render_image(&self.image, size);
     }
 
     fn render_tile(&self, _: imlib2_wrapper::Rect) {
     }
-
 }

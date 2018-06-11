@@ -1,11 +1,11 @@
 #![allow(non_snake_case)]
-use std::ptr;
 use std::ffi::CString;
 use std::os::raw::c_void;
+use std::ptr;
 
-use libc::{c_ulong,c_int,c_uint,c_uchar,c_long};
-use x11::{xlib,xinerama};
 use imlib2_wrapper;
+use libc::{c_int, c_long, c_uchar, c_uint, c_ulong};
+use x11::{xinerama, xlib};
 
 pub trait Initialize {
     fn initialize() -> Self;
@@ -29,7 +29,6 @@ impl Initialize for u64 {
         0
     }
 }
-
 
 impl Initialize for xlib::XGCValues {
     fn initialize() -> Self {
@@ -72,7 +71,7 @@ pub struct XorgSession {
 
 pub struct Window {
     pub window: xlib::Window,
-    display: *mut xlib::Display
+    display: *mut xlib::Display,
 }
 
 impl Window {
@@ -91,11 +90,17 @@ impl Window {
         format: c_int,
         mode: c_int,
         data: *const T,
-        nelements: c_int
+        nelements: c_int,
     ) -> c_int {
         XChangeProperty(
-            self.display, self.window, property,
-            property_type, format, mode, data, nelements
+            self.display,
+            self.window,
+            property,
+            property_type,
+            format,
+            mode,
+            data,
+            nelements,
         )
     }
 
@@ -107,14 +112,19 @@ impl Window {
         delete: bool,
         req_type: xlib::Atom,
     ) -> WindowProperty {
-        XGetWindowProperty(self.display, self.window, property, long_offset, long_length, delete, req_type)
+        XGetWindowProperty(
+            self.display,
+            self.window,
+            property,
+            long_offset,
+            long_length,
+            delete,
+            req_type,
+        )
     }
 
     pub fn pixmap(&self, w: u32, h: u32, depth: u32) -> xlib::Pixmap {
-        XCreatePixmap(
-            self.display, self.window,
-            w, h, depth
-        )
+        XCreatePixmap(self.display, self.window, w, h, depth)
     }
 
     pub fn query_pointer(&self) -> Pointer {
@@ -126,7 +136,19 @@ impl Window {
         let mut wy: c_int = 0;
         let mut mask: c_uint = 0;
 
-        unsafe { xlib::XQueryPointer(self.display, self.window, &mut root, &mut child, &mut rx, &mut ry, &mut wx, &mut wy, &mut mask) };
+        unsafe {
+            xlib::XQueryPointer(
+                self.display,
+                self.window,
+                &mut root,
+                &mut child,
+                &mut rx,
+                &mut ry,
+                &mut wx,
+                &mut wy,
+                &mut mask,
+            )
+        };
 
         Pointer {
             root,
@@ -145,7 +167,6 @@ impl Drop for XorgSession {
         //self.close();
     }
 }
-
 
 impl XorgSession {
     pub fn default() -> Self {
@@ -188,16 +209,17 @@ impl XorgSession {
         XCloseDisplay(self.disp)
     }
 
-    pub fn fill_rectangle(&self,
+    pub fn fill_rectangle(
+        &self,
         d: c_ulong,
         gc: xlib::GC,
         x: c_int,
         y: c_int,
         width: c_uint,
-        height: c_uint) -> c_int {
+        height: c_uint,
+    ) -> c_int {
         XFillRectangle(self.disp, d, gc, x, y, width, height)
     }
-
 
     pub fn set_close_down_mode(&self, mode: c_int) -> c_int {
         XSetCloseDownMode(self.disp, mode)
@@ -212,7 +234,6 @@ impl XorgSession {
     }
 
     pub fn atom(&self, atom_name: &str, only_if_exists: bool) -> Option<xlib::Atom> {
-
         let atom = XInternAtom(self.disp, atom_name, only_if_exists);
 
         if atom == 0 {
@@ -226,24 +247,19 @@ impl XorgSession {
         XSync(self.disp, discard)
     }
 
-
-    pub fn gc(&self, drawable: c_ulong, valuemask: c_ulong, values: &mut xlib::XGCValues) -> xlib::GC {
-        XCreateGC(
-            self.disp, drawable,
-            valuemask,
-            values
-        )
+    pub fn gc(
+        &self,
+        drawable: c_ulong,
+        valuemask: c_ulong,
+        values: &mut xlib::XGCValues,
+    ) -> xlib::GC {
+        XCreateGC(self.disp, drawable, valuemask, values)
     }
 
     pub fn named_color<T: AsRef<str>>(&self, name: T) -> xlib::XColor {
-
         let mut color = xlib::XColor::initialize();
 
-        XAllocNamedColorSame(
-            self.disp,
-            self.colormap,
-            name.as_ref(), &mut color
-        );
+        XAllocNamedColorSame(self.disp, self.colormap, name.as_ref(), &mut color);
 
         color
     }
@@ -251,11 +267,7 @@ impl XorgSession {
     pub fn parse_color<T: AsRef<str>>(&self, val: T) -> xlib::XColor {
         let mut color = xlib::XColor::initialize();
 
-        XParseColor(
-            self.disp,
-            self.colormap,
-            val.as_ref(), &mut color
-        );
+        XParseColor(self.disp, self.colormap, val.as_ref(), &mut color);
 
         color
     }
@@ -290,46 +302,45 @@ impl<'a> imlib2_wrapper::AsRect for &'a xinerama::XineramaScreenInfo {
 
 impl XorgSession {
     pub fn xinerama_screens<'a>(&self) -> Option<XineramaScreens<'a>> {
-
         if XineramaIsActive(self.disp) {
-
             let mut _screens_ptr = ptr::null();
             let mut count: i32 = 0;
             let mut screen = None;
 
             let pointer = self.root.query_pointer();
-            let pos = Point { x: pointer.rx, y: pointer.ry };
+            let pos = Point {
+                x: pointer.rx,
+                y: pointer.ry,
+            };
 
             _screens_ptr = XineramaQueryScreens(self.disp, &mut count);
             let mut screens = Vec::with_capacity(count as usize);
 
-
             for i in 0..count {
-                let info: &xinerama::XineramaScreenInfo = unsafe { &*_screens_ptr.offset(i as isize) };
+                let info: &xinerama::XineramaScreenInfo =
+                    unsafe { &*_screens_ptr.offset(i as isize) };
                 screens.push(info);
 
                 if pos.in_rectangle(
-                        info.x_org as i32,
-                        info.y_org as i32,
-                        info.width as i32,
-                        info.height as i32) {
+                    info.x_org as i32,
+                    info.y_org as i32,
+                    info.width as i32,
+                    info.height as i32,
+                ) {
                     screen = Some(i);
                 }
             }
 
-            Some(
-                XineramaScreens {
-                    screens,
-                    count,
-                    screen,
-                }
-            )
+            Some(XineramaScreens {
+                screens,
+                count,
+                screen,
+            })
         } else {
             None
         }
     }
 }
-
 
 //TODO change rust types to libc?
 pub fn XOpenDisplay(display: Option<&str>) -> *mut xlib::Display {
@@ -341,18 +352,15 @@ pub fn XOpenDisplay(display: Option<&str>) -> *mut xlib::Display {
     }
 }
 
-pub fn XAllocNamedColorSame(display: *mut xlib::Display,
-                        colormap: xlib::Colormap,
-                        color_name: &str,
-                        ret: &mut xlib::XColor)
--> c_int {
+pub fn XAllocNamedColorSame(
+    display: *mut xlib::Display,
+    colormap: xlib::Colormap,
+    color_name: &str,
+    ret: &mut xlib::XColor,
+) -> c_int {
     let color_str = CString::new(color_name).unwrap();
 
-    unsafe { xlib::XAllocNamedColor(
-            display, colormap, color_str.as_ptr(),
-            ret, ret
-        )
-    }
+    unsafe { xlib::XAllocNamedColor(display, colormap, color_str.as_ptr(), ret, ret) }
 }
 
 pub fn XDefaultVisual(display: *mut xlib::Display, scr: i32) -> *mut xlib::Visual {
@@ -395,19 +403,19 @@ pub fn XDefaultColormap(display: *mut xlib::Display, scr: i32) -> c_ulong {
     unsafe { xlib::XDefaultColormap(display, scr) }
 }
 
-pub fn XFillRectangle(display: *mut xlib::Display,
+pub fn XFillRectangle(
+    display: *mut xlib::Display,
     d: c_ulong,
     gc: xlib::GC,
     x: c_int,
     y: c_int,
     width: c_uint,
-    height: c_uint) -> c_int {
-
+    height: c_uint,
+) -> c_int {
     unsafe { xlib::XFillRectangle(display, d, gc, x, y, width, height) }
 }
 
-pub fn XInternAtom(display: *mut xlib::Display, atom_name: &str, only_if_exists: bool)
-    -> c_ulong {
+pub fn XInternAtom(display: *mut xlib::Display, atom_name: &str, only_if_exists: bool) -> c_ulong {
     let atom_str = CString::new(atom_name).unwrap();
     unsafe { xlib::XInternAtom(display, atom_str.as_ptr(), only_if_exists as c_int) }
 }
@@ -428,33 +436,31 @@ pub fn XGetWindowProperty(
     long_length: c_long,
     delete: bool,
     req_type: xlib::Atom,
-    )
-    -> WindowProperty {
-
+) -> WindowProperty {
     let mut property_type: xlib::Atom = 0;
     let mut format: c_int = 0;
     let mut count: c_ulong = 0;
-    let mut bytes_after: c_ulong =0;
+    let mut bytes_after: c_ulong = 0;
 
     let cs = CString::new("").unwrap();
     let mut out_property: *mut c_uchar = cs.into_raw() as *mut c_uchar;
 
-
-    unsafe { xlib::XGetWindowProperty(
-        display,
-        w,
-        property,
-        long_offset,
-        long_length,
-        delete as c_int,
-        req_type,
-        &mut property_type,
-        &mut format,
-        &mut count,
-        &mut bytes_after,
-        &mut out_property,
-    )};
-
+    unsafe {
+        xlib::XGetWindowProperty(
+            display,
+            w,
+            property,
+            long_offset,
+            long_length,
+            delete as c_int,
+            req_type,
+            &mut property_type,
+            &mut format,
+            &mut count,
+            &mut bytes_after,
+            &mut out_property,
+        )
+    };
 
     WindowProperty {
         property_type,
@@ -465,9 +471,7 @@ pub fn XGetWindowProperty(
     }
 }
 
-pub fn XCreatePixmap(display: *mut xlib::Display, scr: u64,
-    w: u32, h: u32, depth: u32) -> c_ulong {
-
+pub fn XCreatePixmap(display: *mut xlib::Display, scr: u64, w: u32, h: u32, depth: u32) -> c_ulong {
     unsafe { xlib::XCreatePixmap(display, scr, w, h, depth) }
 }
 
@@ -475,22 +479,31 @@ pub fn XineramaIsActive(display: *mut xlib::Display) -> bool {
     unsafe { xinerama::XineramaIsActive(display) != 0 }
 }
 
-pub fn XineramaQueryScreens(display: *mut xlib::Display, num: &mut c_int)
-    -> *mut xinerama::XineramaScreenInfo {
+pub fn XineramaQueryScreens(
+    display: *mut xlib::Display,
+    num: &mut c_int,
+) -> *mut xinerama::XineramaScreenInfo {
     unsafe { xinerama::XineramaQueryScreens(display, num) }
 }
 
-pub fn XCreateGC(display: *mut xlib::Display, d: c_ulong,
-    valuemask: c_ulong, values: *mut xlib::XGCValues
+pub fn XCreateGC(
+    display: *mut xlib::Display,
+    d: c_ulong,
+    valuemask: c_ulong,
+    values: *mut xlib::XGCValues,
 ) -> xlib::GC {
     unsafe { xlib::XCreateGC(display, d, valuemask, values) }
 }
 
 pub fn XKillClient(display: *mut xlib::Display, resource: xlib::XID) -> c_int {
-    unsafe { xlib::XKillClient(display,resource) }
+    unsafe { xlib::XKillClient(display, resource) }
 }
 
-pub fn XSetWindowBackgroundPixmap(display: *mut xlib::Display, w: xlib::Window, bg_pixmap: xlib::Pixmap) -> c_int {
+pub fn XSetWindowBackgroundPixmap(
+    display: *mut xlib::Display,
+    w: xlib::Window,
+    bg_pixmap: xlib::Pixmap,
+) -> c_int {
     unsafe { xlib::XSetWindowBackgroundPixmap(display, w, bg_pixmap) }
 }
 
@@ -506,23 +519,29 @@ pub fn XCloseDisplay(display: *mut xlib::Display) -> c_int {
     unsafe { xlib::XCloseDisplay(display) }
 }
 
-pub fn XParseColor(display: *mut xlib::Display, cmap: c_ulong, val: &str, color: *mut xlib::XColor) -> c_int {
+pub fn XParseColor(
+    display: *mut xlib::Display,
+    cmap: c_ulong,
+    val: &str,
+    color: *mut xlib::XColor,
+) -> c_int {
     let val_str = CString::new(val).unwrap();
     unsafe { xlib::XParseColor(display, cmap, val_str.as_ptr(), color) }
 }
 
 pub fn XSetCloseDownMode(display: *mut xlib::Display, close_mode: c_int) -> c_int {
-    unsafe { xlib::XSetCloseDownMode(display,close_mode) }
+    unsafe { xlib::XSetCloseDownMode(display, close_mode) }
 }
 
-pub fn XChangeProperty<T>(display: *mut xlib::Display,
+pub fn XChangeProperty<T>(
+    display: *mut xlib::Display,
     w: xlib::Window,
     property: xlib::Atom,
     property_type: xlib::Atom,
     format: c_int,
     mode: c_int,
     data: *const T,
-    nelements: c_int
+    nelements: c_int,
 ) -> c_int {
     unsafe {
         xlib::XChangeProperty(

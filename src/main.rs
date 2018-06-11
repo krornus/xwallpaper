@@ -1,16 +1,17 @@
+extern crate imlib2;
 extern crate libc;
 extern crate x11;
-extern crate imlib2;
 
-use x11::xlib;
 use libc::c_ulong;
+use x11::xlib;
 
 mod imlib2_wrapper;
-mod xorg;
 mod render;
+mod xorg;
 
-use xorg::{Initialize};
-use imlib2_wrapper::{AsRect};
+use imlib2::Imlib_Load_Error;
+use imlib2_wrapper::AsRect;
+use xorg::Initialize;
 
 /*
  * https://en.wikipedia.org/wiki/Pseudo-transparency
@@ -29,7 +30,6 @@ struct RootWindowProperties {
 }
 
 impl RootWindowProperties {
-
     fn new(xsess: &xorg::XorgSession) -> Self {
         RootWindowProperties {
             root_pixmap: xsess.atom("_XROOTPMAP_ID", true),
@@ -42,39 +42,45 @@ impl RootWindowProperties {
      * if the background is replaced, kill esetroot_pmap_id if it is the same as the root pixmap
      */
     fn cleanse_esetroot(&self, xsess: &xorg::XorgSession) {
-
         let prop_root_pmap = match self.root_pixmap {
             Some(pm) => pm,
-            None => { return; },
+            None => {
+                return;
+            }
         };
 
         let prop_esetroot_pmap = match self.esetroot_pixmap {
             Some(pm) => pm,
-            None => { return; },
+            None => {
+                return;
+            }
         };
 
-        let root_pmap_id = xsess.root.property(
-            prop_root_pmap, 0, 1, false,
-            xlib::AnyPropertyType as u64
-        );
+        let root_pmap_id =
+            xsess
+                .root
+                .property(prop_root_pmap, 0, 1, false, xlib::AnyPropertyType as u64);
 
         if root_pmap_id.property_type == xlib::XA_PIXMAP {
-
             let esetroot_pmap_id = xsess.root.property(
-                prop_esetroot_pmap, 0, 1, false,
-                xlib::AnyPropertyType as u64
+                prop_esetroot_pmap,
+                0,
+                1,
+                false,
+                xlib::AnyPropertyType as u64,
             );
 
-            if !root_pmap_id.property.is_null() && !esetroot_pmap_id.property.is_null() {
-                if esetroot_pmap_id.property_type == xlib::XA_PIXMAP {
+            if !root_pmap_id.property.is_null()
+                && !esetroot_pmap_id.property.is_null()
+                && esetroot_pmap_id.property_type == xlib::XA_PIXMAP
+            {
+                /* safe, these are type XA_PIXMAP */
+                let pm1 = unsafe { *root_pmap_id.property as xlib::Pixmap };
+                let pm2 = unsafe { *esetroot_pmap_id.property as xlib::Pixmap };
 
-                    let pm1 = unsafe { *root_pmap_id.property as xlib::Pixmap };
-                    let pm2 = unsafe { *esetroot_pmap_id.property as xlib::Pixmap };
-
-                    /* kill if equal */
-                    if pm1 == pm2 {
-                        xsess.kill_client(pm1);
-                    }
+                /* kill if equal */
+                if pm1 == pm2 {
+                    xsess.kill_client(pm1);
                 }
             }
 
@@ -90,22 +96,27 @@ impl RootWindowProperties {
 
     /* change the properties that store the current background as pixmap */
     pub fn update_background(&self, xsess: &xorg::XorgSession, drawable: c_ulong) {
-
         self.cleanse_esetroot(xsess);
 
         if let Some(root_pixmap) = self.root_pixmap {
             xsess.root.change_property(
-                root_pixmap, xlib::XA_PIXMAP,
-                32, xlib::PropModeReplace,
-                &drawable, 1
+                root_pixmap,
+                xlib::XA_PIXMAP,
+                32,
+                xlib::PropModeReplace,
+                &drawable,
+                1,
             );
         }
 
         if let Some(esetroot_pixmap) = self.esetroot_pixmap {
             xsess.root.change_property(
-                esetroot_pixmap, xlib::XA_PIXMAP,
-                32, xlib::PropModeReplace,
-                &drawable, 1
+                esetroot_pixmap,
+                xlib::XA_PIXMAP,
+                32,
+                xlib::PropModeReplace,
+                &drawable,
+                1,
             );
         }
     }
@@ -121,6 +132,19 @@ enum ColorOption<T: AsRef<str>> {
     Named(T),
     Hex(T),
     Default,
+}
+
+#[derive(Debug)]
+enum Error {
+    Imlib2(Imlib_Load_Error),
+    InvalidScreen,
+    MissingScreen,
+}
+
+impl From<Imlib_Load_Error> for Error {
+    fn from(err: Imlib_Load_Error) -> Self {
+        Error::Imlib2(err)
+    }
 }
 
 struct BackgroundOptions<T: AsRef<str>> {
@@ -140,16 +164,19 @@ impl<T: AsRef<str>> BackgroundOptions<T> {
         }
     }
 
-    pub fn set_background(&self) {
+    /* do we need two sessions?? */
+    pub fn set_background(&self) -> Result<(), Error> {
 
-        let xsess  = xorg::XorgSession::default();
+        let xsess = xorg::XorgSession::default();
         let xsess2 = xorg::XorgSession::default();
 
-        let xinerama = xsess.xinerama_screens()
-            .expect("Error: no screens found with xinerama");
+        let xinerama = match xsess.xinerama_screens() {
+            Some(scr) => Ok(scr),
+            None => Err(Error::MissingScreen),
+        }?;
 
         let scr = xsess.screen();
-        let (width,height) = (scr.width as u32, scr.height as u32);
+        let (width, height) = (scr.width as u32, scr.height as u32);
 
         imlib2_wrapper::init_imlib2(&xsess, 4);
 
@@ -165,29 +192,29 @@ impl<T: AsRef<str>> BackgroundOptions<T> {
         bg_fill(&xsess, drawable, color);
 
         /* TODO: dont just expect */
-        let wallpaper = render::Wallpaper::load(
-            self.path.as_ref(), drawable
-        ).expect("failed to load wallpaper");
+        let wallpaper = render::Wallpaper::load(self.path.as_ref(), drawable)?;
 
         match self.screen {
             ScreenOption::All => {
                 for scr_inf in xinerama.screens.iter() {
                     wallpaper.render_at(self.mode.clone(), scr_inf.as_rect());
                 }
-            },
+            }
             ScreenOption::Active => {
-                /* TODO: What if None?? */
                 if let Some(scr_inf) = xinerama.active_screen() {
                     wallpaper.render_at(self.mode.clone(), scr_inf.as_rect());
+                } else {
+                    return Err(Error::InvalidScreen);
                 }
-            },
+            }
             ScreenOption::Index(i) => {
                 if i < xinerama.screens.len() {
                     let scr_inf = xinerama.screens[i];
                     wallpaper.render_at(self.mode.clone(), scr_inf.as_rect());
+                } else {
+                    return Err(Error::InvalidScreen);
                 }
-
-            },
+            }
         }
 
         xsess.sync(false);
@@ -212,16 +239,18 @@ impl<T: AsRef<str>> BackgroundOptions<T> {
         xsess2.set_close_down_mode(xlib::RetainPermanent);
         xsess2.free_pixmap(drawable2);
 
-        xsess.close();
+        //xsess.close();
         /* closing xsess2 breaks? */
-        //xsess2.close();
+
+        Ok(())
     }
 }
 
-fn set_background<T: AsRef<str>>(path: T, mode: render::Mode) {
+fn set_background<T: AsRef<str>>(path: T, mode: render::Mode) -> Result<(), Error> {
 
     let opt = BackgroundOptions::new(path, mode);
-    opt.set_background();
+    opt.set_background()
+
 }
 
 fn tile_drawable(xsess: &xorg::XorgSession, d1: c_ulong, d2: c_ulong) {
@@ -232,15 +261,9 @@ fn tile_drawable(xsess: &xorg::XorgSession, d1: c_ulong, d2: c_ulong) {
     gcvalues.fill_style = xlib::FillTiled;
     gcvalues.tile = d1;
 
-    let gc = xsess.gc(d2,
-        (xlib::GCFillStyle | xlib::GCTile) as u64,
-        &mut gcvalues
-    );
+    let gc = xsess.gc(d2, (xlib::GCFillStyle | xlib::GCTile) as u64, &mut gcvalues);
 
-    xsess.fill_rectangle(
-        d2, gc, 0, 0,
-        scr.width as u32, scr.height as u32
-    );
+    xsess.fill_rectangle(d2, gc, 0, 0, scr.width as u32, scr.height as u32);
 
     xsess.free_gc(gc);
 }
@@ -252,23 +275,18 @@ fn bg_fill(xsess: &xorg::XorgSession, drawable: c_ulong, color: xlib::XColor) {
 
     gcval.foreground = color.pixel;
 
-    let gc = xsess.gc(
-        xsess.root.window,
-        (xlib::GCForeground) as u64,
-        &mut gcval
-    );
+    let gc = xsess.gc(xsess.root.window, (xlib::GCForeground) as u64, &mut gcval);
 
-    xsess.fill_rectangle(
-        drawable, gc, 0, 0,
-        scr.width as u32, scr.height as u32
-    );
+    xsess.fill_rectangle(drawable, gc, 0, 0, scr.width as u32, scr.height as u32);
 
     xsess.free_gc(gc);
 }
 
 fn main() {
-    set_background(
-        "/home/spowell/pictures/backgrounds/strangelove_1.png",
-        render::Mode::Max
-    );
+    if let Err(e) = set_background(
+        "/home/spowell/pictures/backgrounds/bladerunner_4.jpg",
+        render::Mode::Max,
+    ) {
+        println!("Error setting background: {:?}", e);
+    }
 }

@@ -1,13 +1,16 @@
 use std::ffi::CString;
 use std::fmt;
 
-use x11::{xlib};
-use libc::{c_int};
+use libc::c_int;
+use x11::xlib;
 
 use imlib2;
 use xorg::XorgSession;
 
-pub fn imlib_load_image_with_error_return(file: &str, err: &mut imlib2::Imlib_Load_Error) -> imlib2::Imlib_Image {
+pub fn imlib_load_image_with_error_return(
+    file: &str,
+    err: &mut imlib2::Imlib_Load_Error,
+) -> imlib2::Imlib_Image {
     let cfile = CString::new(file).unwrap();
     let err_ref = err as *mut imlib2::Imlib_Load_Error;
 
@@ -51,7 +54,6 @@ pub struct Image {
 
 impl Image {
     pub fn load<T: AsRef<str>>(file: T) -> Result<Self, imlib2::Imlib_Load_Error> {
-
         let mut err = 0;
 
         let im = imlib_load_image_with_error_return(file.as_ref(), &mut err);
@@ -86,10 +88,13 @@ pub trait AsRect {
 
 impl fmt::Debug for Rect {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Rect {{ x: {}, y: {}, w: {}, h: {} }}", self.x, self.y, self.w, self.h)
+        write!(
+            f,
+            "Rect {{ x: {}, y: {}, w: {}, h: {} }}",
+            self.x, self.y, self.w, self.h
+        )
     }
 }
-
 
 #[derive(Debug)]
 pub struct DrawableContext {
@@ -113,19 +118,17 @@ impl DrawableContext {
         self.set_image_context(im.image);
 
         unsafe {
-            imlib2::imlib_render_image_on_drawable_at_size(
-                size.x, size.y, size.w, size.h);
+            imlib2::imlib_render_image_on_drawable_at_size(size.x, size.y, size.w, size.h);
         }
     }
 
     pub fn render_image_part(&self, im: &Image, part: Rect, size: Rect) {
-
         self.set_image_context(im.image);
 
         unsafe {
             imlib2::imlib_render_image_part_on_drawable_at_size(
-                part.x, part.y, part.w, part.h,
-                size.x, size.y, size.w, size.h);
+                part.x, part.y, part.w, part.h, size.x, size.y, size.w, size.h,
+            );
         }
     }
 
