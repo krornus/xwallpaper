@@ -122,20 +122,20 @@ impl RootWindowProperties {
     }
 }
 
-enum ScreenOption {
+pub enum ScreenOption {
     All,
     Active,
     Index(usize),
 }
 
-enum ColorOption<T: AsRef<str>> {
+pub enum ColorOption<T: AsRef<str>> {
     Named(T),
     Hex(T),
     Default,
 }
 
 #[derive(Debug)]
-enum Error {
+pub enum Error {
     Imlib2(Imlib_Load_Error),
     InvalidScreen,
     MissingScreen,
@@ -147,15 +147,15 @@ impl From<Imlib_Load_Error> for Error {
     }
 }
 
-struct BackgroundOptions<T: AsRef<str>> {
-    path: T,
-    mode: render::Mode,
-    bgcolor: ColorOption<T>,
-    screen: ScreenOption,
+pub struct BackgroundOptions<T: AsRef<str>> {
+    pub path: T,
+    pub mode: render::Mode,
+    pub bgcolor: ColorOption<T>,
+    pub screen: ScreenOption,
 }
 
 impl<T: AsRef<str>> BackgroundOptions<T> {
-    fn new(path: T, mode: render::Mode) -> Self {
+    pub fn new(path: T, mode: render::Mode) -> Self {
         BackgroundOptions {
             path,
             mode,
@@ -246,7 +246,7 @@ impl<T: AsRef<str>> BackgroundOptions<T> {
     }
 }
 
-fn set_background<T: AsRef<str>>(path: T, mode: render::Mode) -> Result<(), Error> {
+pub fn set_background<T: AsRef<str>>(path: T, mode: render::Mode) -> Result<(), Error> {
 
     let opt = BackgroundOptions::new(path, mode);
     opt.set_background()
@@ -280,13 +280,4 @@ fn bg_fill(xsess: &xorg::XorgSession, drawable: c_ulong, color: xlib::XColor) {
     xsess.fill_rectangle(drawable, gc, 0, 0, scr.width as u32, scr.height as u32);
 
     xsess.free_gc(gc);
-}
-
-fn main() {
-    if let Err(e) = set_background(
-        "/home/spowell/pictures/backgrounds/bladerunner_4.jpg",
-        render::Mode::Max,
-    ) {
-        println!("Error setting background: {:?}", e);
-    }
 }
