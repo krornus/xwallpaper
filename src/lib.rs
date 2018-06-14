@@ -2,15 +2,19 @@ extern crate imlib2;
 extern crate libc;
 extern crate x11;
 
+use std::ffi::OsStr;
+
 use libc::c_ulong;
 use x11::xlib;
 
-mod imlib2_wrapper;
-mod render;
+mod image;
+pub mod namedcolor;
+pub mod render;
 mod xorg;
 
+use image::AsRect;
 use imlib2::Imlib_Load_Error;
-use imlib2_wrapper::AsRect;
+use namedcolor::NamedColor;
 use xorg::Initialize;
 
 /*
@@ -129,7 +133,7 @@ pub enum ScreenOption {
 }
 
 pub enum ColorOption<T: AsRef<str>> {
-    Named(T),
+    Named(NamedColor),
     Hex(T),
     Default,
 }
@@ -147,14 +151,14 @@ impl From<Imlib_Load_Error> for Error {
     }
 }
 
-pub struct BackgroundOptions<T: AsRef<str>> {
+pub struct BackgroundOptions<T: AsRef<OsStr> + Sized, S: AsRef<str>> {
     pub path: T,
     pub mode: render::Mode,
-    pub bgcolor: ColorOption<T>,
+    pub bgcolor: ColorOption<S>,
     pub screen: ScreenOption,
 }
 
-impl<T: AsRef<str>> BackgroundOptions<T> {
+impl<T: AsRef<OsStr> + Sized, S: AsRef<str>> BackgroundOptions<T, S> {
     pub fn new(path: T, mode: render::Mode) -> Self {
         BackgroundOptions {
             path,
@@ -165,8 +169,8 @@ impl<T: AsRef<str>> BackgroundOptions<T> {
     }
 
     /* do we need two sessions?? */
-    pub fn set_background(&self) -> Result<(), Error> {
-
+    /* TODO: change path to PathBuf instead of str */
+    pub fn set_wallpaper(&self) -> Result<(), Error> {
         let xsess = xorg::XorgSession::default();
         let xsess2 = xorg::XorgSession::default();
 
@@ -178,44 +182,22 @@ impl<T: AsRef<str>> BackgroundOptions<T> {
         let scr = xsess.screen();
         let (width, height) = (scr.width as u32, scr.height as u32);
 
-        imlib2_wrapper::init_imlib2(&xsess, 4);
+        image::init_imlib2(&xsess, 4);
 
         let drawable = xsess.root.pixmap(width, height, xsess.depth);
-
         let color = match &self.bgcolor {
-            ColorOption::Default => xsess.named_color("black"),
-            ColorOption::Named(n) => xsess.named_color(n),
+            ColorOption::Default => NamedColor::Black.color(xsess.disp, xsess.colormap),
+            ColorOption::Named(n) => n.color(xsess.disp, xsess.colormap),
+            // TODO: check if failed (invalid hex)
             ColorOption::Hex(h) => xsess.parse_color(h),
         };
 
         /* TODO: Add check to see if this is necessary or filled over */
         bg_fill(&xsess, drawable, color);
 
-        /* TODO: dont just expect */
         let wallpaper = render::Wallpaper::load(self.path.as_ref(), drawable)?;
 
-        match self.screen {
-            ScreenOption::All => {
-                for scr_inf in xinerama.screens.iter() {
-                    wallpaper.render_at(self.mode.clone(), scr_inf.as_rect());
-                }
-            }
-            ScreenOption::Active => {
-                if let Some(scr_inf) = xinerama.active_screen() {
-                    wallpaper.render_at(self.mode.clone(), scr_inf.as_rect());
-                } else {
-                    return Err(Error::InvalidScreen);
-                }
-            }
-            ScreenOption::Index(i) => {
-                if i < xinerama.screens.len() {
-                    let scr_inf = xinerama.screens[i];
-                    wallpaper.render_at(self.mode.clone(), scr_inf.as_rect());
-                } else {
-                    return Err(Error::InvalidScreen);
-                }
-            }
-        }
+        render(wallpaper, &self.screen, xinerama, &self.mode)?;
 
         xsess.sync(false);
 
@@ -239,22 +221,51 @@ impl<T: AsRef<str>> BackgroundOptions<T> {
         xsess2.set_close_down_mode(xlib::RetainPermanent);
         xsess2.free_pixmap(drawable2);
 
-        //xsess.close();
         /* closing xsess2 breaks? */
+        xsess.close();
 
         Ok(())
     }
 }
 
-pub fn set_background<T: AsRef<str>>(path: T, mode: render::Mode) -> Result<(), Error> {
+pub fn set_wallpaper<T: AsRef<OsStr> + Sized>(path: T, mode: render::Mode) -> Result<(), Error> {
+    let opt = BackgroundOptions::<T, &str>::new(path, mode);
+    opt.set_wallpaper()
+}
 
-    let opt = BackgroundOptions::new(path, mode);
-    opt.set_background()
+fn render(
+    wallpaper: render::Wallpaper,
+    screen: &ScreenOption,
+    xinerama: xorg::XineramaScreens,
+    mode: &render::Mode,
+) -> Result<(), Error> {
+    match screen {
+        ScreenOption::All => {
+            for scr_inf in xinerama.screens.iter() {
+                wallpaper.render_at(mode.clone(), scr_inf.as_rect());
+            }
+        }
+        ScreenOption::Active => {
+            if let Some(scr_inf) = xinerama.active_screen() {
+                wallpaper.render_at(mode.clone(), scr_inf.as_rect());
+            } else {
+                return Err(Error::InvalidScreen);
+            }
+        }
+        ScreenOption::Index(i) => {
+            if *i < xinerama.screens.len() {
+                let scr_inf = xinerama.screens[*i];
+                wallpaper.render_at(mode.clone(), scr_inf.as_rect());
+            } else {
+                return Err(Error::InvalidScreen);
+            }
+        }
+    }
 
+    Ok(())
 }
 
 fn tile_drawable(xsess: &xorg::XorgSession, d1: c_ulong, d2: c_ulong) {
-
     let mut gcvalues = xlib::XGCValues::initialize();
     let scr = xsess.screen();
 
@@ -269,7 +280,6 @@ fn tile_drawable(xsess: &xorg::XorgSession, d1: c_ulong, d2: c_ulong) {
 }
 
 fn bg_fill(xsess: &xorg::XorgSession, drawable: c_ulong, color: xlib::XColor) {
-
     let mut gcval = xlib::XGCValues::initialize();
     let scr = xsess.screen();
 

@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use std::ffi::{CString, OsStr};
 use std::fmt;
 
 use libc::c_int;
@@ -53,10 +53,16 @@ pub struct Image {
 }
 
 impl Image {
-    pub fn load<T: AsRef<str>>(file: T) -> Result<Self, imlib2::Imlib_Load_Error> {
+    pub fn load<T: AsRef<OsStr> + Sized>(file: T) -> Result<Self, imlib2::Imlib_Load_Error> {
         let mut err = 0;
 
-        let im = imlib_load_image_with_error_return(file.as_ref(), &mut err);
+        // TODO: add utf8 support (as bytes)?
+        let path = file
+            .as_ref()
+            .to_str()
+            .expect("utf8 filenames not currently supported");
+
+        let im = imlib_load_image_with_error_return(path, &mut err);
 
         unsafe { imlib2::imlib_context_set_image(im) };
 

@@ -1,9 +1,9 @@
 #![allow(non_snake_case)]
-use std::ffi::CString;
+use std::ffi::{CString};
 use std::os::raw::c_void;
 use std::ptr;
 
-use imlib2_wrapper;
+use image;
 use libc::{c_int, c_long, c_uchar, c_uint, c_ulong};
 use x11::{xinerama, xlib};
 
@@ -256,14 +256,6 @@ impl XorgSession {
         XCreateGC(self.disp, drawable, valuemask, values)
     }
 
-    pub fn named_color<T: AsRef<str>>(&self, name: T) -> xlib::XColor {
-        let mut color = xlib::XColor::initialize();
-
-        XAllocNamedColorSame(self.disp, self.colormap, name.as_ref(), &mut color);
-
-        color
-    }
-
     pub fn parse_color<T: AsRef<str>>(&self, val: T) -> xlib::XColor {
         let mut color = xlib::XColor::initialize();
 
@@ -289,9 +281,9 @@ impl<'a> XineramaScreens<'a> {
     }
 }
 
-impl<'a> imlib2_wrapper::AsRect for &'a xinerama::XineramaScreenInfo {
-    fn as_rect(&self) -> imlib2_wrapper::Rect {
-        imlib2_wrapper::Rect {
+impl<'a> image::AsRect for &'a xinerama::XineramaScreenInfo {
+    fn as_rect(&self) -> image::Rect {
+        image::Rect {
             x: self.x_org.into(),
             y: self.y_org.into(),
             w: self.width.into(),
@@ -350,17 +342,6 @@ pub fn XOpenDisplay(display: Option<&str>) -> *mut xlib::Display {
     } else {
         unsafe { xlib::XOpenDisplay(ptr::null()) }
     }
-}
-
-pub fn XAllocNamedColorSame(
-    display: *mut xlib::Display,
-    colormap: xlib::Colormap,
-    color_name: &str,
-    ret: &mut xlib::XColor,
-) -> c_int {
-    let color_str = CString::new(color_name).unwrap();
-
-    unsafe { xlib::XAllocNamedColor(display, colormap, color_str.as_ptr(), ret, ret) }
 }
 
 pub fn XDefaultVisual(display: *mut xlib::Display, scr: i32) -> *mut xlib::Visual {
@@ -497,6 +478,10 @@ pub fn XCreateGC(
 
 pub fn XKillClient(display: *mut xlib::Display, resource: xlib::XID) -> c_int {
     unsafe { xlib::XKillClient(display, resource) }
+}
+
+pub fn XAllocColor(display: *mut xlib::Display, cm: c_ulong, color: *mut xlib::XColor) -> c_int {
+    unsafe { xlib::XAllocColor(display, cm, color) }
 }
 
 pub fn XSetWindowBackgroundPixmap(
