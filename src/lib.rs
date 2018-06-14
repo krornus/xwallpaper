@@ -222,7 +222,8 @@ impl<T: AsRef<OsStr> + Sized, S: AsRef<str>> BackgroundOptions<T, S> {
         xsess2.free_pixmap(drawable2);
 
         /* closing xsess2 breaks? */
-        xsess.close();
+        //xsess.close();
+
 
         Ok(())
     }
